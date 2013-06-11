@@ -4,26 +4,81 @@
 
 #include <stm32f30x.h>
 
+// Function prototypes
 extern void delay_us(uint32_t us);
+void init_clock(void);
+
+static volatile uint32_t time = 0;
 
 /**
- * Stub required by newlibc.
- * 
- * E.g. for malloc()
+ * Systick Interrupt handler
  */
 void
-_sbrk(void)
+SysTick_Handler(void)
 {
+	time++;
 }
 
-/**
- * Stub required by newlibc.
- *
- * Used for static constructors in C++
- */
-void
-_init(void)
+
+
+int
+main (void)
 {
+	init_clock();
+	
+	// Struct of PIO Port E
+	GPIO_TypeDef *PE = GPIOE;
+	
+	// Red LED (North) is PE9
+	// Red LED (South) is PE13
+	// Set mode to 01 -> Output
+	PE->MODER = (1 << (9*2)) | (1 << (13*2));
+
+	// Switch LED on (is connected between IO and GND => active high)
+	PE->ODR = (1 << 9) | (1 << 13);
+	
+	uint32_t count_led1 = 0;
+	uint32_t count_led2 = 0;
+	while(1)
+	{
+		// Toggle LED1 every 500 ms
+		if ((time - count_led1) >= 500) {
+			count_led1 = time;
+
+			if (PE->ODR & (1 << 9)) {
+				PE->BRR = (1 << 9);
+			}
+			else {
+				PE->BSRR = (1 << 9);
+			}
+		}
+		
+		// Toggle LED2 every 300 ms
+		if ((time - count_led2) >= 300) {
+			count_led2 = time;
+
+			if (PE->ODR & (1 << 13)) {
+				PE->BRR = (1 << 13);
+			}
+			else {
+				PE->BSRR = (1 << 13);
+			}
+		}
+	}
+}
+
+void
+init_systick(void)
+{
+	// Lower systick interrupt priority to lowest level
+	NVIC_SetPriority(SysTick_IRQn, 0xf);
+	
+	// Set interrupt frequency to 1000 Hz
+	SysTick->LOAD = (F_CPU / 1000) - 1;
+	
+	SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk |
+	                SysTick_CTRL_ENABLE_Msk |
+	                SysTick_CTRL_TICKINT_Msk;
 }
 
 /**
@@ -33,7 +88,7 @@ _init(void)
  * 72 MHz system clock.
  */
 void
-init_clock()
+init_clock(void)
 {
 	// use external 8MHz clock from ST-LINK
 	RCC->CR |= RCC_CR_HSEBYP | RCC_CR_HSEON;
@@ -87,53 +142,23 @@ init_clock()
 	}
 }
 
-int
-main (void)
+/**
+ * Stub required by newlibc.
+ * 
+ * E.g. for malloc()
+ */
+void
+_sbrk(void)
 {
-	init_clock();
-	
-	// Struct of PIO Port E
-	GPIO_TypeDef *PE = GPIOE;
-	
-	// Red LED (North) is PE9
-	// Red LED (South) is PE13
-	// Set mode to 01 -> Output
-	PE->MODER = (1 << (9*2)) | (1 << (13*2));
-
-	// Switch LED on (is connected between IO and GND => active high)
-	PE->ODR = (1 << 9) | (1 << 13);
-	
-	uint32_t count_led1 = 0;
-	uint32_t count_led2 = 0;
-	while(1)
-	{
-		count_led1++;
-		if (count_led1 >= 500) {
-			count_led1 = 0;
-
-			if (PE->ODR & (1 << 9)) {
-				PE->BRR = (1 << 9);
-			}
-			else {
-				PE->BSRR = (1 << 9);
-			}
-		}
-		
-		count_led2++;
-		if (count_led2 >= 300) {
-			count_led2 = 0;
-
-			if (PE->ODR & (1 << 13)) {
-				PE->BRR = (1 << 13);
-			}
-			else {
-				PE->BSRR = (1 << 13);
-			}
-		}
-			
-		delay_us(1000);
-	}
 }
 
-
+/**
+ * Stub required by newlibc.
+ *
+ * Used for static constructors in C++
+ */
+void
+_init(void)
+{
+}
 
